@@ -3,7 +3,7 @@ einops==0.8.1
 huggingface_hub==0.29.1
 matplotlib==3.7.0
 numpy==1.24.4
-opencv_python==4.7.0.72
+opencv-python-headless
 pyarrow==11.0.0
 PyYAML==6.0.2
 Requests==2.32.3

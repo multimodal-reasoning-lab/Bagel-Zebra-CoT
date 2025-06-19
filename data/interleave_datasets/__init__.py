@@ -2,4 +2,5 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from .edit_dataset import UnifiedEditIterableDataset
+from .think_trace_dataset import ThinkTraceJSONLIterableDataset
 

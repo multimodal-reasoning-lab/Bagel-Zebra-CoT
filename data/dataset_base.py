@@ -136,6 +136,9 @@ class PackedDataset(torch.utils.data.IterableDataset):
                     else:
                         dataset_args['jsonl_path_list'].append(meta_info['jsonl_path'])
 
+                if 'image_prefix_dir' in meta_info.keys():
+                    dataset_args['image_prefix_dir'] = meta_info['image_prefix_dir']
+
             resume_data_status = dataset_args.pop('resume_data_status', True)
             if data_status is not None and grouped_dataset_name in data_status.keys() and resume_data_status:
                 data_status_per_group = data_status[grouped_dataset_name]
@@ -233,7 +236,143 @@ class PackedDataset(torch.utils.data.IterableDataset):
             data['ce_loss_indexes'] = torch.tensor(sequence_status['ce_loss_indexes'])
             data['ce_loss_weights'] = torch.tensor(sequence_status['ce_loss_weights'])
 
+        # Debug printing for rank 0
+        if self.local_rank == 0:
+            self.print_debug_info(data, sequence_status)
+
         return data
+
+    def print_debug_info(self, data, sequence_status):
+        """Print detailed debug information in an intuitive table format"""
+        print("\n" + "="*120)
+        print("DEBUG: Complete Sequence Analysis")
+        print("="*120)
+        
+        # Basic info
+        print(f"Sequence Length: {data['sequence_length']}")
+        print(f"Sample Lengths: {data['sample_lens']}")
+        
+        # Get all data
+        packed_text_ids = data['packed_text_ids'].tolist()
+        packed_text_indexes = data['packed_text_indexes'].tolist()
+        
+        # Build loss mappings
+        ce_loss_indexes = set(data.get('ce_loss_indexes', []).tolist())
+        mse_loss_indexes = set(data.get('mse_loss_indexes', []).tolist())
+        vit_token_indexes = set(data.get('packed_vit_token_indexes', []).tolist())
+        vae_token_indexes = set(data.get('packed_vae_token_indexes', []).tolist())
+        
+        # Build label mapping
+        label_mapping = {}
+        if 'ce_loss_indexes' in data:
+            ce_indexes = data['ce_loss_indexes'].tolist()
+            ce_labels = data['packed_label_ids'].tolist()
+            for i, pos in enumerate(ce_indexes):
+                label_mapping[pos] = ce_labels[i]
+        
+        # Print raw token sequence
+        print(f"\n1. Raw Token IDs: {packed_text_ids}")
+        
+        # Print decoded token sequence
+        try:
+            decoded_text_tokens = []
+            for token_id in packed_text_ids:
+                decoded = self.tokenizer.decode([token_id])
+                decoded_text_tokens.append(decoded)
+            print(f"2. Decoded Tokens: {decoded_text_tokens}")
+        except Exception as e:
+            print(f"2. Error decoding tokens: {e}")
+            decoded_text_tokens = ["<ERROR>"] * len(packed_text_ids)
+        
+        # Create comprehensive sequence table
+        print(f"\n3. Complete Sequence Table:")
+        print("-" * 120)
+        print(f"{'Order':<6} | {'Token Type':<12} | {'Token/Content':<30} | {'Loss Type':<10} | {'Label':<30} | {'Notes':<20}")
+        print("-" * 120)
+        
+        # Track text token index
+        text_token_idx = 0
+        
+        for pos in range(data['sequence_length']):
+            # Determine token type and content
+            if pos in packed_text_indexes:
+                # This is a text token position
+                token_id = packed_text_ids[text_token_idx]
+                try:
+                    decoded_token = self.tokenizer.decode([token_id])
+                    token_content = f"ID:{token_id} '{decoded_token}'"
+                except:
+                    token_content = f"ID:{token_id} '<ERROR>'"
+                token_type = "TEXT"
+                text_token_idx += 1
+                
+            elif pos in vit_token_indexes:
+                token_type = "VIT_IMAGE"
+                token_content = "[VIT Image Patch]"
+                
+            elif pos in vae_token_indexes:
+                token_type = "VAE_IMAGE"  
+                token_content = "[VAE Image Latent]"
+                
+            else:
+                token_type = "UNKNOWN"
+                token_content = "[Unknown Position]"
+            
+            # Determine loss type
+            if pos in ce_loss_indexes:
+                loss_type = "CE"
+            elif pos in mse_loss_indexes:
+                loss_type = "MSE"
+            else:
+                loss_type = "None"
+            
+            # Determine label
+            if pos in label_mapping:
+                label_id = label_mapping[pos]
+                try:
+                    decoded_label = self.tokenizer.decode([label_id])
+                    label_content = f"ID:{label_id} '{decoded_label}'"
+                except:
+                    label_content = f"ID:{label_id} '<ERROR>'"
+            elif pos in mse_loss_indexes:
+                label_content = "[Image Generation Target]"
+            else:
+                label_content = "N/A"
+            
+            # Additional notes
+            notes = ""
+            if pos in mse_loss_indexes and 'packed_timesteps' in data:
+                timestep_idx = list(mse_loss_indexes).index(pos) if pos in mse_loss_indexes else -1
+                if timestep_idx >= 0 and timestep_idx < len(data['packed_timesteps']):
+                    timestep = data['packed_timesteps'][timestep_idx].item()
+                    if timestep == float('-inf'):
+                        notes = "No noise"
+                    else:
+                        notes = f"t={timestep:.3f}"
+            
+            print(f"{pos:<6} | {token_type:<12} | {token_content:<30} | {loss_type:<10} | {label_content:<30} | {notes:<20}")
+        
+        print("-" * 120)
+        
+        # Summary statistics
+        total_positions = data['sequence_length']
+        ce_positions = len(ce_loss_indexes)
+        mse_positions = len(mse_loss_indexes)
+        vit_positions = len(vit_token_indexes)
+        vae_positions = len(vae_token_indexes)
+        text_positions = len(packed_text_indexes)
+        no_loss_positions = total_positions - ce_positions - mse_positions
+        
+        print(f"\nSummary Statistics:")
+        print(f"  Total positions: {total_positions}")
+        print(f"  Text tokens: {text_positions} ({text_positions/total_positions*100:.1f}%)")
+        print(f"  VIT image tokens: {vit_positions} ({vit_positions/total_positions*100:.1f}%)")
+        print(f"  VAE image tokens: {vae_positions} ({vae_positions/total_positions*100:.1f}%)")
+        print(f"  Positions with CE loss: {ce_positions} ({ce_positions/total_positions*100:.1f}%)")
+        print(f"  Positions with MSE loss: {mse_positions} ({mse_positions/total_positions*100:.1f}%)")
+        print(f"  Positions with no loss: {no_loss_positions} ({no_loss_positions/total_positions*100:.1f}%)")
+        
+        print("="*120 + "\n")
 
     def __iter__(self):
         total_weights = sum(self.grouped_weights)
@@ -401,9 +540,18 @@ class PackedDataset(torch.utils.data.IterableDataset):
                     curr_rope_id += 1
                     continue
 
+                
+
+
                 # add a <|startofimage|> token
                 sequence_status['packed_text_ids'].append(self.start_of_image)
                 sequence_status['packed_text_indexes'].append(curr)
+
+                if item['special_token_loss'] == 1:
+                    sequence_status['ce_loss_indexes'].append(curr)
+                    sequence_status['ce_loss_weights'].append(1.0)
+                    sequence_status['packed_label_ids'].append(item['special_token_label'])
+                        
                 curr += 1
                 curr_split_len += 1
 

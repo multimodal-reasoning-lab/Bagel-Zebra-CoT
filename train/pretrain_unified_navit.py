@@ -323,7 +323,7 @@ class TrainingArguments:
     )
     freeze_vae: bool = field(
         default=True,
-        metadata={"help": "Keep VAE weights fixed; only predict latents, don’t fine-tune encoder/decoder."}
+        metadata={"help": "Keep VAE weights fixed; only predict latents, don't fine-tune encoder/decoder."}
     )
     freeze_und: bool = field(
         default=False,
@@ -359,9 +359,9 @@ def main():
             resume=training_args.wandb_resume,
             mode="offline" if training_args.wandb_offline else "online"
         )
-        wandb.config.update(training_args)
-        wandb.config.update(model_args)
-        wandb.config.update(data_args)
+        wandb.config.update(training_args, allow_val_change=True)
+        wandb.config.update(model_args, allow_val_change=True)
+        wandb.config.update(data_args, allow_val_change=True)
     else:
         logger = create_logger(None, dist.get_rank())
     dist.barrier()
@@ -532,6 +532,7 @@ def main():
     # Setup packed dataloader
     with open(data_args.dataset_config_file, "r") as stream:
         dataset_meta = yaml.safe_load(stream)
+    print(dataset_meta)
     dataset_config = DataConfig(grouped_datasets=dataset_meta)
     if training_args.visual_und:
         dataset_config.vit_patch_size = model_args.vit_patch_size

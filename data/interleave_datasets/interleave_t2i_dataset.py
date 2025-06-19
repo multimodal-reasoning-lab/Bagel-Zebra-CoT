@@ -18,31 +18,37 @@ class InterleavedBaseIterableDataset(DistributedIterableDataset):
         }
         return data
 
-    def _add_text(self, data, text, need_loss, enable_cfg=True):
+    def _add_text(self, data, text, need_loss, enable_cfg=True, next_token_label=None):
         text_ids = self.tokenizer.encode(text)
         data['num_tokens'] += len(text_ids)
         data['text_ids_list'].append(text_ids)
+        
+        # If next_token_label is provided, the im_end token should predict it
+        special_token_loss = 1 if next_token_label is not None else 0
+        
         data['sequence_plan'].append(
             {
                 'type': 'text',
                 'enable_cfg': int(enable_cfg),
                 'loss': int(need_loss),
-                'special_token_loss': 0,
-                'special_token_label': None,
+                'special_token_loss': special_token_loss,
+                'special_token_label': next_token_label,
             }
         )
         return data
 
-    def _add_image(self, data, image, need_loss, need_vae, need_vit, enable_cfg=True):
+    def _add_image(self, data, image, need_loss, need_vae, need_vit, enable_cfg=True, special_token_label=None):
         assert need_loss or need_vae or need_vit
 
         if need_loss:
+            # For loss images, don't add special_token_loss on the start token
+            # The previous text token should predict the vision_start token
             data['sequence_plan'].append(
                 {
                     'type': 'vae_image', 
                     'enable_cfg': 0, 
                     'loss': 1, 
-                    'special_token_loss': 0,
+                    'special_token_loss': 0,  # No loss on start token itself
                     'special_token_label': None,
                 }
             )
