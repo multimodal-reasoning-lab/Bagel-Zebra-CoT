@@ -228,7 +228,7 @@ class TrainingArguments:
         metadata={"help": "Save a checkpoint every N training steps."}
     )
     total_steps: int = field(
-        default=500_000,
+        default=20000,
         metadata={"help": "Total number of optimizer steps to train for."}
     )
 

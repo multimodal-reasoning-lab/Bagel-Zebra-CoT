@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright 2025 Bytedance Ltd. and/or its affiliates.
 # SPDX-License-Identifier: Apache-2.0
 export HF_HOME=/dev/shm/
@@ -5,8 +6,8 @@ NUM_NODES=1
 NODE_RANK=0
 MASTER_ADDR=localhost
 MASTER_PORT=29500
-NPROC_PER_NODE=4
-MODEL_PATH=/home/jovyan/workspace/Bagel/models/BAGEL-7B-MoT
+NPROC_PER_NODE=8
+MODEL_PATH=/dev/shm/models/BAGEL-7B-MoT
 
 # replace the variables with your own
 torchrun \
@@ -27,11 +28,20 @@ torchrun \
   --finetune-from-ema True \
   --log_every 1 \
   --lr 2e-5 \
+  --lr_scheduler cosine \
+  --min_lr 1e-6 \
   --num_worker 1 \
   --expected_num_tokens 32768 \
   --max_num_tokens 36864 \
-  --max_num_tokens_per_sample 16384 \
+  --max_num_tokens_per_sample 36864 \
   --num_shard=$NPROC_PER_NODE \
-  --sharding_strategy="FULL_SHARD" \
-  --cpu_offload True \
+  --sharding_strategy="HYBRID_SHARD" \
+  --wandb_project "zebra-cot" \
   --wandb_name "zebra-cot-$(date +%Y%m%d_%H%M%S)" \
+  --save_every 200 \
+  --warmup_steps 100 \
+  --total_steps 20000 \
+  --results_dir /dev/shm/results/ \
+  --checkpoint_dir /dev/shm/results/checkpoints/ > run.out 2> run.err
+
+# --cpu_offload True \

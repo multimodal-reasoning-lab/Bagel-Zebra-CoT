@@ -187,6 +187,9 @@ class ThinkTraceJSONLIterableDataset(InterleavedBaseIterableDataset, Distributed
         # Clean reasoning trace by removing image references for text processing
         clean_reasoning_trace = self.replace_image_references(reasoning_trace)
         
+        # Append final answer to the reasoning trace
+        clean_reasoning_trace += f" Final Answer: {final_answer}"
+        
         # Split reasoning trace by image placeholders to interleave text and images
         text_parts = clean_reasoning_trace.split('<IMAGE_PLACEHOLDER>')
         
@@ -213,9 +216,6 @@ class ThinkTraceJSONLIterableDataset(InterleavedBaseIterableDataset, Distributed
                     need_vit=True,   # VIT understanding
                     enable_cfg=True,
                 )
-
-        # 6. Add final answer (with loss)
-        data = self._add_text(data, final_answer, need_loss=True, enable_cfg=True)
 
         return data
 

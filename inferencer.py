@@ -196,10 +196,11 @@ class InterleaveInferencer:
             do_sample=do_sample,
             temperature=temperature,
             end_token_id=self.new_token_ids['eos_token_id'],
+            # end_token_id=151652,
             **generation_input,
         )
+
         output = self.tokenizer.decode(unpacked_latent[:,0])
-        output = output.split('<|im_end|>')[0].split('<|im_start|>')[1]
         return output
         
     @torch.no_grad()

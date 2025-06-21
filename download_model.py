@@ -1,7 +1,7 @@
 from huggingface_hub import snapshot_download
 
 HF_HOME = "/dev/shm/"
-save_dir = "models/BAGEL-7B-MoT"
+save_dir = HF_HOME + "models/BAGEL-7B-MoT"
 repo_id = "ByteDance-Seed/BAGEL-7B-MoT"
 cache_dir = HF_HOME + save_dir + "/cache"
 

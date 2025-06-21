@@ -16,21 +16,6 @@ DATASET_REGISTRY = {
 
 
 DATASET_INFO = {
-    'unified_edit':{
-        'seedxedit_multi': {
-            'data_dir': '/home/jovyan/workspace/Bagel/bagel_example/editing/seedxedit_multi',
-            'num_files': 10,
-            'num_total_samples': 1000,
-            "parquet_info_path": '/home/jovyan/workspace/Bagel/bagel_example/editing/parquet_info/seedxedit_multi.json', # information of the parquet files
-		},
-    },
-    'vlm_sft': {
-        'llava_ov': {
-			'data_dir': '/home/jovyan/workspace/Bagel/bagel_example/vlm/images',
-			'jsonl_path': '/home/jovyan/workspace/Bagel/bagel_example/vlm/llava_ov_si.jsonl',
-			'num_total_samples': 1000
-		},
-    },
     'think_trace': {
         'think_trace_dataset': {
             'data_dir': '/dev/shm/data/Zebra-CoT/zebra-cot-images',

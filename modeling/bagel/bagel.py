@@ -162,6 +162,7 @@ class Bagel(PreTrainedModel):
         else:
             attention_mask = nested_attention_masks
 
+        # if self.config.visual_und and vit_token_seqlens is not None:
         if self.config.visual_und:
             cu_seqlens = torch.nn.functional.pad(torch.cumsum(vit_token_seqlens, dim=0), (1, 0))
             cu_seqlens = cu_seqlens.to(torch.int32)
@@ -951,6 +952,41 @@ class Bagel(PreTrainedModel):
             step += 1
 
             if end_token_id is not None and curr_tokens[0] == end_token_id: # only support batch=1
+                # Check if next token would be vision_start (151652)
+                generated_sequence.append(curr_tokens)  # Add the end token
+                
+                # Generate one more token to check if it's vision_start
+                packed_text_embedding = self.language_model.model.embed_tokens(curr_tokens)
+                
+                uppacked = list(packed_key_value_indexes.split(key_values_lens.tolist(), dim=0))
+                for i in range(len(uppacked)):
+                    uppacked[i] += i
+                packed_key_value_indexes = torch.cat(uppacked, dim=0)
+                
+                output = self.language_model.forward_inference(
+                    packed_query_sequence=packed_text_embedding,
+                    query_lens=query_lens,
+                    packed_query_position_ids=packed_query_position_ids,
+                    packed_query_indexes=packed_query_indexes,
+                    past_key_values=past_key_values,
+                    key_values_lens=key_values_lens,
+                    packed_key_value_indexes=packed_key_value_indexes,
+                    update_past_key_values=False,
+                    is_causal=True,
+                    **extra_inputs,
+                )
+                
+                pred_logits = self.language_model.lm_head(output.packed_query_sequence)
+                if do_sample:
+                    probs = nn.functional.softmax(pred_logits / temperature, dim=-1)
+                    next_token = torch.multinomial(probs, num_samples=1).squeeze(1)
+                else:
+                    next_token = torch.argmax(pred_logits, dim=-1)
+                
+                # If next token is vision_start (151652), include it
+                if next_token[0] == 151652:
+                    generated_sequence.append(next_token)
+                
                 break
 
         output_device = generated_sequence[0].device
