@@ -3,6 +3,7 @@
 
 import functools
 import os
+import shutil
 import wandb
 import yaml
 from copy import deepcopy
@@ -691,6 +692,25 @@ def main():
                 fsdp_config=fsdp_config,
                 data_status=gather_list
             )
+
+            # Delete old checkpoints (keep at most 3)
+            if dist.get_rank() == 0:
+                try:
+                    # Get all checkpoint directories
+                    checkpoint_dirs = [d for d in os.listdir(training_args.checkpoint_dir) 
+                                     if os.path.isdir(os.path.join(training_args.checkpoint_dir, d)) 
+                                     and d.isdigit()]
+                    checkpoint_dirs.sort()  # Sort by step number (oldest first)
+                    logger.info(f"Sorted checkpoint directories: {checkpoint_dirs}")
+                    
+                    # Keep at most 3 checkpoints, delete the oldest ones
+                    while len(checkpoint_dirs) > 3:
+                        oldest_checkpoint = checkpoint_dirs.pop(0)  # Remove oldest from list
+                        old_path = os.path.join(training_args.checkpoint_dir, oldest_checkpoint)
+                        shutil.rmtree(old_path)
+                        logger.info(f"Deleted old checkpoint folder: {old_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete old checkpoints: {e}")
 
     logger.info("Done!")
     if dist.get_rank() == 0:

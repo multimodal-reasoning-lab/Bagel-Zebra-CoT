@@ -31,17 +31,17 @@ torchrun \
   --lr_scheduler cosine \
   --min_lr 1e-6 \
   --num_worker 1 \
-  --expected_num_tokens 32768 \
-  --max_num_tokens 36864 \
-  --max_num_tokens_per_sample 36864 \
+  --expected_num_tokens 60000 \
+  --max_num_tokens 60000 \
+  --max_num_tokens_per_sample 60000 \
   --num_shard=$NPROC_PER_NODE \
   --sharding_strategy="HYBRID_SHARD" \
   --wandb_project "zebra-cot" \
-  --wandb_name "zebra-cot-$(date +%Y%m%d_%H%M%S)" \
-  --save_every 200 \
+  --wandb_name "h200-zebra-cot-$(date +%Y%m%d_%H%M%S)" \
+  --save_every 50 \
   --warmup_steps 100 \
-  --total_steps 20000 \
-  --results_dir /dev/shm/results/ \
-  --checkpoint_dir /dev/shm/results/checkpoints/ > run.out 2> run.err
+  --total_steps 10000 \
+  --results_dir results/ \
+  --checkpoint_dir results/checkpoints/ > run.out 2> run.err
 
 # --cpu_offload True \

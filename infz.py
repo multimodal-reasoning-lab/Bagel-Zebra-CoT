@@ -29,8 +29,8 @@ from modeling.bagel.qwen2_navit import NaiveCache
 from modeling.autoencoder import load_ae
 
 # Set paths for your trained checkpoint
-checkpoint_dir = "/dev/shm/results_old/checkpoints"
-checkpoint_step = "0000250"
+checkpoint_dir = "results/checkpoints"
+checkpoint_step = "0000050"
 base_model_path = "/dev/shm/models/BAGEL-7B-MoT"
 
 # Your trained checkpoint path
@@ -146,6 +146,9 @@ print("Model loaded in fp32, converting to bfloat16...")
 
 # Convert model to bfloat16 after loading
 model = model.to(dtype=torch.bfloat16)
+# save the bf16 version:
+# torch.save(model.state_dict(), "model_bf16.safetensors")
+
 model = model.eval()
 
 print('Model loaded and converted to bfloat16!')

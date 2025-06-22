@@ -237,8 +237,8 @@ class PackedDataset(torch.utils.data.IterableDataset):
             data['ce_loss_weights'] = torch.tensor(sequence_status['ce_loss_weights'])
 
         # Debug printing for rank 0
-        if self.local_rank == 0:
-            self.print_debug_info(data, sequence_status)
+        # if self.local_rank == 0:
+        #     self.print_debug_info(data, sequence_status)
 
         return data
 
