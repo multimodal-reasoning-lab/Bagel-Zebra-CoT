@@ -33,3 +33,10 @@ download model
 ```bash
 python download_model.py
 ```
+
+
+### Inference
+
+```bash
+python infz_bf16.py
+```

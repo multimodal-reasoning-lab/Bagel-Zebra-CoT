@@ -29,12 +29,17 @@ from modeling.bagel.qwen2_navit import NaiveCache
 from modeling.autoencoder import load_ae
 
 # Set paths for your trained checkpoint
-checkpoint_dir = "results/checkpoints"
-checkpoint_step = "0000050"
+checkpoint_dir = "/home/jovyan/workspace/bagel-training/h200-ckpt-0001200"
 base_model_path = "/dev/shm/models/BAGEL-7B-MoT"
 
-# Your trained checkpoint path
-your_checkpoint_path = os.path.join(checkpoint_dir, checkpoint_step)
+# Direct path to the safetensors file
+checkpoint_file = "model_bf16.safetensors"
+checkpoint_path = os.path.join(checkpoint_dir, checkpoint_file)
+
+print(f"Checkpoint directory: {checkpoint_dir}")
+print(f"Checkpoint file: {checkpoint_file}")
+print(f"Full checkpoint path: {checkpoint_path}")
+print(f"File exists: {os.path.exists(checkpoint_path)}")
 
 print(f"Available GPUs: {torch.cuda.device_count()}")
 print(f"GPU memory per device:")
@@ -82,17 +87,17 @@ tokenizer, new_token_ids, _ = add_special_tokens(tokenizer)
 
 # Image Transform Preparing
 vae_transform = ImageTransform(1024, 512, 16)
-vit_transform = ImageTransform(980, 224, 14)
+vit_transform = ImageTransform(980, 512, 14)
 
-# Device mapping for 8x80GB GPUs - use more memory since we're loading fp32 first
-max_mem_per_gpu = "80GiB"  # Use more memory to accommodate fp32 loading
+# Device mapping for 8x80GB GPUs - use bf16 directly
+max_mem_per_gpu = "80GiB"
 
 print("Setting up device mapping...")
 device_map = infer_auto_device_map(
     model,
     max_memory={i: max_mem_per_gpu for i in range(torch.cuda.device_count())},
     no_split_module_classes=["Bagel", "Qwen2MoTDecoderLayer"],
-    dtype=torch.float32,  # Use fp32 for device mapping since checkpoint is fp32
+    dtype=torch.bfloat16,  # Use bf16 for device mapping
 )
 
 print("Device map:", device_map)
@@ -124,34 +129,25 @@ else:
 
 print("Final device map:", device_map)
 
-# Load checkpoint with fp32, then convert to bf16
-checkpoint_file = "model.safetensors"
-checkpoint_path = os.path.join(your_checkpoint_path, checkpoint_file)
+# Load checkpoint directly in bf16
+print(f"Loading checkpoint directly in bfloat16: {checkpoint_path}")
+print("Loading model from safetensors file...")
 
-
-print(f"Loading fp32 checkpoint: {checkpoint_path}")
-print("This will load in fp32 then convert to bf16...")
-
-# Load model - let it load in fp32 first
+# Load model directly in bf16
 model = load_checkpoint_and_dispatch(
     model,
     checkpoint=checkpoint_path,
     device_map=device_map,
-    offload_buffers=False,  # With 8x80GB, no need to offload  
-    dtype=torch.float32,    # Load as fp32 to match checkpoint
+    offload_buffers=False,
+    dtype=torch.bfloat16,   # Load directly as bf16
     force_hooks=True,
 )
 
-print("Model loaded in fp32, converting to bfloat16...")
-
-# Convert model to bfloat16 after loading
-model = model.to(dtype=torch.bfloat16)
-# save the bf16 version:
-# torch.save(model.state_dict(), "model_bf16.safetensors")
-
 model = model.eval()
 
-print('Model loaded and converted to bfloat16!')
+print('Model loaded directly in bfloat16!')
+print(f"Model dtype: {next(model.parameters()).dtype}")
+print("Model loading completed successfully!")
 
 # Check memory usage
 print("GPU memory usage after loading:")
@@ -187,50 +183,58 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 inference_hyper=dict(
+    do_sample=True,
+    text_temperature=0.7,
     cfg_text_scale=4.0,
-    cfg_img_scale=1.0,
-    cfg_interval=[0.4, 1.0],
+    cfg_img_scale=2.0,
+    cfg_interval=[0.0, 1.0],
     timestep_shift=3.0,
     num_timesteps=50,
     cfg_renorm_min=0.0,
-    cfg_renorm_type="global",
+    cfg_renorm_type="text_channel",
 )
 
-# prompt = "A female cosplayer portraying an ethereal fairy or elf, wearing a flowing dress made of delicate fabrics in soft, mystical colors like emerald green and silver. She has pointed ears, a gentle, enchanting expression, and her outfit is adorned with sparkling jewels and intricate patterns. The background is a magical forest with glowing plants, mystical creatures, and a serene atmosphere."
-
-# print(prompt)
-# print('-' * 10)
-# output_dict = inferencer(text=prompt, **inference_hyper)
-
-# # Save the generated image
-# output_image = output_dict['image']
-# output_image.save('generated_image.png')
-# print("Image saved as 'generated_image.png'")
+INTERLEAVED_SYSTEM_PROMPT = '''You are an AI reasoning assistant capable of step-by-step interleaved text and visual chain of thought. Think step by step and use visual aids to enhance your problem-solving. Provide your final conclusion clearly in the format of "Final Answer: <answer here>"'''
 
 
 # prompt = '''A multi‑piece box jigsaw is missing part(s). Identify which option fills the hole(s).'''
 # image = Image.open('/home/jovyan/workspace/bagel-training/eval/sample_12400/raw_files/images/problem_image_1.jpg')
 
-prompt = '''What is the best move for Black to play?\n\nA: Qd6\nB: Kf8\nC: Nf4\nD: Nxe4'''
-image = Image.open('/home/jovyan/workspace/bagel-training/eval/chess/game_2040/raw_files/images/problem_image_1.png')
+# prompt = '''What is the best move for Black to play?\n\nA: Qd6\nB: Kf8\nC: Nf4\nD: Nxe4'''
+# image = Image.open('/home/jovyan/workspace/bagel-training/eval/chess/game_2040/raw_files/images/problem_image_1.png')
+# pdf_filename = "chess.pdf"
 
-print(prompt)
-print('-'*50)
+# prompt = '''Apply the following sequence of transformations to the blue shape: scale by 2×, then translate 1 left, then translate 1 down and 2 right, then translate 2 down and 1 right, then rotate 90° clockwise. Choose the option that shows the resulting shape.'''
+# image = Image.open('/home/jovyan/workspace/bagel-training/new_eval/compose_8847/images/problem_image_1.jpg')
+# pdf_filename = "compose_8847.pdf"
+
+# prompt = '''Which of the figures shown bellow cannot be cut out of the figure illustrated nearby?'''
+# image = Image.open('/home/jovyan/workspace/bagel-training/image.jpg')
+# pdf_filename = "math.pdf"
+
+prompt = '''Subtract all green metallic cylinders. Subtract all cyan blocks. How many objects are left?'''
+image = Image.open('/home/jovyan/workspace/bagel-training/new_eval/image.png')
+pdf_filename = "clevr.pdf"
+
+# print(prompt)
+# print('-'*50)
 
 reasoning_text = []
 reasoning_images = []
 current_input = [prompt, image]
+think = False
 
 # Loop until no more vision_start tokens
 iteration = 0
 while True:    
     # Get understanding output
     print(f"iteration: {iteration}")
-    output = inferencer.interleave_inference(current_input, understanding_output=True, **inference_hyper)
-    
-    # Check if there's vision_start in the output
-    if '<|vision_start|>' not in output[0]:
-        # Add final text output if any
+    output = inferencer.interleave_inference(current_input, understanding_output=True, system_prompt=INTERLEAVED_SYSTEM_PROMPT, think=think, **inference_hyper)
+
+    should_stop = ('<|vision_start|>' not in output[0]) or ('Final Answer' in output[0])
+
+    if should_stop:
+        # print(f"should_stop: {output[0]}")
         if output[0].strip():
             extracted_text = output[0].split('<|im_end|>')[0].split('<|im_start|>')[1]
             reasoning_text.append(extracted_text)
@@ -239,23 +243,36 @@ while True:
         break
     
     # Extract reasoning text
-    print(f"raw output: {output[0]}")
+    # print(f"raw output: {output[0]}")
     extracted_text = output[0].split('<|im_end|>')[0].split('<|im_start|>')[1]
     reasoning_text.append(extracted_text)
     print(f"{extracted_text}")
     
     # Generate image based on current reasoning
     current_input_with_reasoning = current_input + [extracted_text]
-    image_output = inferencer.interleave_inference(current_input_with_reasoning, **inference_hyper)
-    
+    if not think:
+        output = inferencer.interleave_inference(current_input_with_reasoning, system_prompt=INTERLEAVED_SYSTEM_PROMPT, think=think, **inference_hyper)
+        image_output = output[0]
+        
+    else: 
+        output = inferencer.interleave_inference(current_input_with_reasoning, system_prompt=INTERLEAVED_SYSTEM_PROMPT, think=think, **inference_hyper)
+
+        thinking_text = output[0]
+        print(f"image generation thinking_text: {thinking_text}")
+        extracted_text = thinking_text.split('<|im_end|>')[0].split('<|im_start|>')[1]
+        # reasoning_text.append(extracted_text)
+        # current_input_with_reasoning = current_input + [extracted_text]
+        image_output = output[1]
+
     # Save and collect the generated image
-    reasoning_images.append(image_output[0])
+    reasoning_images.append(image_output)
     image_filename = f'reasoning_image_{iteration + 1}.png'
-    image_output[0].save(image_filename)
+    image_output.save(image_filename)
     print(f"Image saved at '{image_filename}'")
+
     
     # Update input for next iteration
-    current_input = current_input_with_reasoning + [image_output[0]]
+    current_input = current_input_with_reasoning + [image_output]
     
     iteration += 1
     print('-'*50)
@@ -270,7 +287,6 @@ from reportlab.lib.units import inch
 import io
 
 # Create PDF
-pdf_filename = "example.pdf"
 doc = SimpleDocTemplate(pdf_filename, pagesize=A4)
 styles = getSampleStyleSheet()
 story = []
@@ -322,21 +338,6 @@ if len(reasoning_text) > len(reasoning_images):
         story.append(Paragraph(f"Final Reasoning {i + 1}:", styles['Heading2']))
         story.append(Paragraph(reasoning_text[i].replace('\n', '<br/>'), styles['Normal']))
         story.append(Spacer(1, 20))
-
-# Add final conclusion
-story.append(Paragraph("Final Conclusion:", styles['Heading2']))
-conclusion_style = ParagraphStyle(
-    'Conclusion',
-    parent=styles['Normal'],
-    fontSize=12,
-    backgroundColor='lightgray',
-    borderPadding=10,
-    borderWidth=1,
-    borderColor='gray'
-)
-story.append(Paragraph(final_text.replace('\n', '<br/>'), conclusion_style))
-story.append(Spacer(1, 20))
-
 # Build PDF
 doc.build(story)
 print(f"PDF saved as '{pdf_filename}'")

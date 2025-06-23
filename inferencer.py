@@ -12,10 +12,10 @@ from modeling.bagel.qwen2_navit import NaiveCache
 
 
 
-VLM_THINK_SYSTEM_PROMPT = '''You should first think about the reasoning process in the mind and then provide the user with the answer. 
+VLM_THINK_SYSTEM_PROMPT = '''Generation Instructions: You should first think about the reasoning process in the mind and then provide the user with the answer. 
 The reasoning process is enclosed within <think> </think> tags, i.e. <think> reasoning process here </think> answer here'''
 
-GEN_THINK_SYSTEM_PROMPT = '''You should first think about the planning process in the mind and then generate the image. 
+GEN_THINK_SYSTEM_PROMPT = '''Generation Instructions: You should first think about the planning process in the mind and then generate the image. 
 The planning process is enclosed within <think> </think> tags, i.e. <think> planning process here </think> image here'''
 
 
@@ -209,7 +209,7 @@ class InterleaveInferencer:
         input_lists: List[Union[str, Image.Image]],
         think=False,
         understanding_output=False,
-
+        system_prompt=None,
         max_think_token_n=1000,
         do_sample=False,
         text_temperature=0.3,
@@ -229,11 +229,7 @@ class InterleaveInferencer:
         cfg_img_context = deepcopy(gen_context)
 
         with torch.autocast(device_type="cuda", enabled=True, dtype=torch.bfloat16):
-            if think:
-                if understanding_output:
-                    system_prompt = VLM_THINK_SYSTEM_PROMPT 
-                else:
-                    system_prompt = GEN_THINK_SYSTEM_PROMPT
+            if system_prompt:
                 gen_context = self.update_context_text(system_prompt, gen_context)
                 cfg_img_context = self.update_context_text(system_prompt, cfg_img_context)
 
@@ -259,6 +255,9 @@ class InterleaveInferencer:
 
             else:
                 if think:
+                    system_prompt_for_think = GEN_THINK_SYSTEM_PROMPT
+                    gen_context = self.update_context_text(system_prompt_for_think, gen_context)
+                    cfg_img_context = self.update_context_text(system_prompt_for_think, cfg_img_context)
                     gen_text = self.gen_text(gen_context, do_sample=do_sample, temperature=text_temperature, max_length=max_think_token_n)
                     gen_context = self.update_context_text(gen_text, gen_context)
                     output_list.append(gen_text)

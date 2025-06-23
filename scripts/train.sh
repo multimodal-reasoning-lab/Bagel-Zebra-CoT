@@ -34,13 +34,14 @@ torchrun \
   --expected_num_tokens 60000 \
   --max_num_tokens 60000 \
   --max_num_tokens_per_sample 60000 \
+  --prefer_buffer_before 30000 \
   --num_shard=$NPROC_PER_NODE \
   --sharding_strategy="HYBRID_SHARD" \
   --wandb_project "zebra-cot" \
   --wandb_name "h200-zebra-cot-$(date +%Y%m%d_%H%M%S)" \
   --save_every 50 \
-  --warmup_steps 100 \
-  --total_steps 10000 \
+  --warmup_steps 50 \
+  --total_steps 5000 \
   --results_dir results/ \
   --checkpoint_dir results/checkpoints/ > run.out 2> run.err
 

@@ -92,6 +92,14 @@ def upload_model_files(repo_id, checkpoint_dir, bf16_model_path, token=None):
             )
             print(f"✓ Successfully uploaded {repo_filename}")
             
+            # Remove the bf16 model file after successful upload
+            if repo_filename == "model_bf16.safetensors":
+                try:
+                    os.remove(local_path)
+                    print(f"✓ Cleaned up local file: {local_path}")
+                except Exception as cleanup_error:
+                    print(f"Warning: Failed to remove {local_path}: {cleanup_error}")
+            
         except Exception as e:
             print(f"✗ Failed to upload {repo_filename}: {str(e)}")
     
@@ -117,8 +125,8 @@ def main():
     
     args = parser.parse_args()
     
-    # Format checkpoint number with 0000 prefix
-    checkpoint_formatted = f"0000{args.checkpoint}"
+    # Format checkpoint number with 7 digits, padded with leading zeros
+    checkpoint_formatted = f"{int(args.checkpoint):07d}"
     
     # Auto-generate paths if not provided
     if args.repo_id is None:
