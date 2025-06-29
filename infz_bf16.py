@@ -29,7 +29,7 @@ from modeling.bagel.qwen2_navit import NaiveCache
 from modeling.autoencoder import load_ae
 
 # Set paths for your trained checkpoint
-checkpoint_dir = "/home/jovyan/workspace/bagel-training/h200-ckpt-0001200"
+checkpoint_dir = "/home/jovyan/workspace/bagel/Bagel-Zebra-CoT-ckpt-0000300"
 base_model_path = "/dev/shm/models/BAGEL-7B-MoT"
 
 # Direct path to the safetensors file
@@ -183,7 +183,7 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 inference_hyper=dict(
-    do_sample=True,
+    do_sample=False,
     text_temperature=0.7,
     cfg_text_scale=4.0,
     cfg_img_scale=2.0,
@@ -191,31 +191,43 @@ inference_hyper=dict(
     timestep_shift=3.0,
     num_timesteps=50,
     cfg_renorm_min=0.0,
-    cfg_renorm_type="text_channel",
+    cfg_renorm_type="global",
 )
 
-INTERLEAVED_SYSTEM_PROMPT = '''You are an AI reasoning assistant capable of step-by-step interleaved text and visual chain of thought. Think step by step and use visual aids to enhance your problem-solving. Provide your final conclusion clearly in the format of "Final Answer: <answer here>"'''
+# INTERLEAVED_SYSTEM_PROMPT = '''You are an AI reasoning assistant capable of step-by-step interleaved text and visual chain of thought. Think step by step and use visual aids to enhance your problem-solving. Once you are confident that you know the final answer, provide your final conclusion clearly in the format of "Final Answer: <answer here>"'''
 
+INTERLEAVED_SYSTEM_PROMPT = "You are an AI reasoning assistant capable of step-by-step interleaved text and visual chain of thought. Think step by step and generate visual aids to enhance your problem-solving. You should first think about the reasoning and planning process in the mind before generating visual aids. Wrap your text reasoning with <think></think> tokens, and wrap your final conclusion with <answer></answer> tokens. Provide your final conclusion clearly in the format of '<answer>Final Answer: <answer here></answer>'"
 
 # prompt = '''A multi‑piece box jigsaw is missing part(s). Identify which option fills the hole(s).'''
 # image = Image.open('/home/jovyan/workspace/bagel-training/eval/sample_12400/raw_files/images/problem_image_1.jpg')
 
 # prompt = '''What is the best move for Black to play?\n\nA: Qd6\nB: Kf8\nC: Nf4\nD: Nxe4'''
-# image = Image.open('/home/jovyan/workspace/bagel-training/eval/chess/game_2040/raw_files/images/problem_image_1.png')
+# image = Image.open('/home/jovyan/workspace/bagel/eval/chess/game_2040/raw_files/images/problem_image_1.png')
 # pdf_filename = "chess.pdf"
 
 # prompt = '''Apply the following sequence of transformations to the blue shape: scale by 2×, then translate 1 left, then translate 1 down and 2 right, then translate 2 down and 1 right, then rotate 90° clockwise. Choose the option that shows the resulting shape.'''
-# image = Image.open('/home/jovyan/workspace/bagel-training/new_eval/compose_8847/images/problem_image_1.jpg')
+# image = Image.open('/home/jovyan/workspace/bagel/new_eval/compose_8847/images/problem_image_1.jpg')
 # pdf_filename = "compose_8847.pdf"
 
 # prompt = '''Which of the figures shown bellow cannot be cut out of the figure illustrated nearby?'''
-# image = Image.open('/home/jovyan/workspace/bagel-training/image.jpg')
+# image = Image.open('/home/jovyan/workspace/bagel/image.jpg')
 # pdf_filename = "math.pdf"
 
-prompt = '''Subtract all green metallic cylinders. Subtract all cyan blocks. How many objects are left?'''
-image = Image.open('/home/jovyan/workspace/bagel-training/new_eval/image.png')
-pdf_filename = "clevr.pdf"
+# prompt = '''Question: Subtract all green metallic cylinders. Subtract all cyan blocks. How many objects are left?'''
+# image = Image.open('/home/jovyan/workspace/bagel/new_eval/image.png')
+# pdf_filename = "clevr.pdf"
 
+prompt = '''How many points are there in the three unseen sides of dice?'''
+image = Image.open('prompt_image_0.png')
+
+
+# prompt = '''Hint: Please answer the question and provide the correct option letter, e.g., A, B, C, D, at the end.
+# Question: Is the number of tiny gray bicycles that are on the left side of the brown metal sedan greater than the number of things that are to the left of the tiny green bicycle?
+# Choices:
+# (A) Yes
+# (B) No'''
+# image = Image.open('/home/jovyan/workspace/bagel/image.png')
+# pdf_filename = "math_vista.pdf"
 # print(prompt)
 # print('-'*50)
 
@@ -231,7 +243,7 @@ while True:
     print(f"iteration: {iteration}")
     output = inferencer.interleave_inference(current_input, understanding_output=True, system_prompt=INTERLEAVED_SYSTEM_PROMPT, think=think, **inference_hyper)
 
-    should_stop = ('<|vision_start|>' not in output[0]) or ('Final Answer' in output[0])
+    should_stop = ('<answer>' in output[0]) or ('Final Answer' in output[0])
 
     if should_stop:
         # print(f"should_stop: {output[0]}")
@@ -249,99 +261,20 @@ while True:
     print(f"{extracted_text}")
     
     # Generate image based on current reasoning
-    current_input_with_reasoning = current_input + [extracted_text]
-    if not think:
-        output = inferencer.interleave_inference(current_input_with_reasoning, system_prompt=INTERLEAVED_SYSTEM_PROMPT, think=think, **inference_hyper)
+    current_input = current_input + [extracted_text]
+    if '<|vision_start|>' in output[0]:
+        output = inferencer.interleave_inference(current_input, system_prompt=INTERLEAVED_SYSTEM_PROMPT, think=think, **inference_hyper)
         image_output = output[0]
         
-    else: 
-        output = inferencer.interleave_inference(current_input_with_reasoning, system_prompt=INTERLEAVED_SYSTEM_PROMPT, think=think, **inference_hyper)
+        # Save and collect the generated image
+        reasoning_images.append(image_output)
+        image_filename = f'reasoning_image_{iteration + 1}.png'
+        image_output.save(image_filename)
+        print(f"Image saved at '{image_filename}'")
 
-        thinking_text = output[0]
-        print(f"image generation thinking_text: {thinking_text}")
-        extracted_text = thinking_text.split('<|im_end|>')[0].split('<|im_start|>')[1]
-        # reasoning_text.append(extracted_text)
-        # current_input_with_reasoning = current_input + [extracted_text]
-        image_output = output[1]
-
-    # Save and collect the generated image
-    reasoning_images.append(image_output)
-    image_filename = f'reasoning_image_{iteration + 1}.png'
-    image_output.save(image_filename)
-    print(f"Image saved at '{image_filename}'")
-
-    
-    # Update input for next iteration
-    current_input = current_input_with_reasoning + [image_output]
+        
+        # Update input for next iteration
+        current_input = current_input + [image_output]
     
     iteration += 1
     print('-'*50)
-
-# Create PDF with all reasoning text and images
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.utils import ImageReader
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-import io
-
-# Create PDF
-doc = SimpleDocTemplate(pdf_filename, pagesize=A4)
-styles = getSampleStyleSheet()
-story = []
-
-# Add title
-title_style = ParagraphStyle(
-    'CustomTitle',
-    parent=styles['Heading1'],
-    fontSize=16,
-    spaceAfter=30,
-    alignment=1  # Center alignment
-)
-story.append(Paragraph("Example", title_style))
-story.append(Spacer(1, 20))
-
-# Add original question
-story.append(Paragraph("Original Question:", styles['Heading2']))
-story.append(Paragraph(prompt.replace('\n', '<br/>'), styles['Normal']))
-story.append(Spacer(1, 20))
-
-# Add original image
-story.append(Paragraph("Problem Image:", styles['Heading2']))
-# Convert PIL image to reportlab format
-img_buffer = io.BytesIO()
-image.save(img_buffer, format='PNG')
-img_buffer.seek(0)
-img = RLImage(img_buffer, width=4*inch, height=4*inch)
-story.append(img)
-story.append(Spacer(1, 20))
-
-# Add reasoning steps
-for i, (text, img) in enumerate(zip(reasoning_text, reasoning_images)):
-    story.append(Paragraph(f"Reasoning Step {i + 1}:", styles['Heading2']))
-    story.append(Paragraph(text.replace('\n', '<br/>'), styles['Normal']))
-    story.append(Spacer(1, 10))
-    
-    # Add generated image
-    story.append(Paragraph(f"Generated Image {i + 1}:", styles['Heading3']))
-    img_buffer = io.BytesIO()
-    img.save(img_buffer, format='PNG')
-    img_buffer.seek(0)
-    rl_img = RLImage(img_buffer, width=4*inch, height=4*inch)
-    story.append(rl_img)
-    story.append(Spacer(1, 20))
-
-# Add any final reasoning text that didn't generate an image
-if len(reasoning_text) > len(reasoning_images):
-    for i in range(len(reasoning_images), len(reasoning_text)):
-        story.append(Paragraph(f"Final Reasoning {i + 1}:", styles['Heading2']))
-        story.append(Paragraph(reasoning_text[i].replace('\n', '<br/>'), styles['Normal']))
-        story.append(Spacer(1, 20))
-# Build PDF
-doc.build(story)
-print(f"PDF saved as '{pdf_filename}'")
-print(f"Total reasoning steps: {len(reasoning_text)}")
-print(f"Total generated images: {len(reasoning_images)}")
-
-
