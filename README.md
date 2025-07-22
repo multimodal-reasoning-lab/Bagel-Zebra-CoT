@@ -23,6 +23,17 @@ Set the `HF_HOME` in `download_model.py` to the path of the checkpoint you want 
 python download_model.py
 ```
 
+You can also do this straight from python if your `HF_HOME` has already been set.
+```python
+from huggingface_hub import snapshot_download
+
+snapshot_download(
+  repo_id="multimodal-reasoning-lab/Bagel-Zebra-CoT",
+  local_dir_use_symlinks=False,
+  resume_download=True,
+  allow_patterns=["*.json", "*.safetensors", "*.bin", "*.py", "*.md", "*.txt"],
+)
+```
 ### Inference
 
 The inference script (`infz_bf16.py`) supports inherent interleaved text and visual reasoning. To customize it for your
