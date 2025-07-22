@@ -3,8 +3,8 @@
 ### Setup
 
 ```bash
-git clone https://github.com/LeonLixyz/bagel-training
-cd bagel-training
+git clone https://github.com/multimodal-reasoning-lab/Bagel-Zebra-CoT.git
+cd Bagel-Zebra-CoT
 conda create -n bagel python=3.10 -y
 conda activate bagel
 pip install -r requirements.txt
