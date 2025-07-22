@@ -1,5 +1,6 @@
 # Zebra-CoT: A Dataset for Interleaved Vision-Language Reasoning
 
+![Image](assets/zebra_cot_datacard.png)
 ### BAGEL Training Zebra-CoT
 
 This repository is adapted from the [Bagel](https://github.com/ByteDance-Seed/Bagel) repository.
