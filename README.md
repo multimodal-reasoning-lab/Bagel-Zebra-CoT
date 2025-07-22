@@ -1,5 +1,8 @@
+# Zebra-CoT: A Dataset for Interleaved Vision-Language Reasoning
+
 ### BAGEL Training Zebra-CoT
 
+This repository is adapted from the [Bagel](https://github.com/ByteDance-Seed/Bagel) repository.
 ### Setup
 
 ```bash
@@ -94,3 +97,12 @@ bash scripts/train.sh
 For details, please refer to the original repo [README](https://github.com/bytedance-seed/BAGEL).
 
 The interleaved reasoning data customized for Zebra-CoT can be found in [think_trace_dataset.py](data/interleave_datasets/think_trace_dataset.py). 
+
+### Cite
+```bibtex
+@misc{li2025zebra,
+  title     = {Zebra-CoT: A Dataset for Interleaved Vision-Language Reasoning},
+  author    = {Li, Ang and Wang, Charles L. and Yue, Kaiyu and Cai, Zikui and Liu, Ollie and Fu, Deqing and Guo, Peng and Zhu, Bill and Sharan, Vatsal and Jia, Robin and Neiswanger, Willie and Huang, Furong and Goldstein, Tom and Goldblum, Micah},
+  year      = {2025},
+}
+```
