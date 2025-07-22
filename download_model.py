@@ -1,6 +1,6 @@
 from huggingface_hub import snapshot_download
 
-HF_HOME = "/dev/shm/"
+HF_HOME = "path/to/your/hf_home"
 
 # Download Bagel-Zebra-CoT
 save_dir = HF_HOME + "models/Bagel-Zebra-CoT"

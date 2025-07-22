@@ -79,8 +79,18 @@ For details, refer to the original jupyter notebook [here](inference.ipynb).
 
 #### Example Use Cases
 
-**Visual Math Problem:**
 ```python
 prompt = "Subtract all cylinders. Add 1 red sphere. How many objects are left?"
 image = Image.open('test_images/image.png')
 ```
+
+### Training
+For training, run 
+
+```bash
+bash scripts/train.sh
+```
+
+For details, please refer to the original repo [README](https://github.com/bytedance-seed/BAGEL).
+
+The interleaved reasoning data customized for Zebra-CoT can be found in [think_trace_dataset.py](data/interleave_datasets/think_trace_dataset.py). 

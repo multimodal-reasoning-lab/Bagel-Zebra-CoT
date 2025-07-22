@@ -31,7 +31,7 @@ from modeling.bagel.qwen2_navit import NaiveCache
 from modeling.autoencoder import load_ae
 
 # Set paths for your trained checkpoint
-checkpoint_dir = "/dev/shm/models/Bagel-Zebra-CoT"
+checkpoint_dir = "path/to/your/HF_HOME/models/Bagel-Zebra-CoT"
 checkpoint_file = "model_bf16.safetensors"
 checkpoint_path = os.path.join(checkpoint_dir, checkpoint_file)
 
