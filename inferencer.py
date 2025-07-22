@@ -207,7 +207,6 @@ class InterleaveInferencer:
     def interleave_inference(
         self,
         input_lists: List[Union[str, Image.Image]],
-        think=False,
         understanding_output=False,
         system_prompt=None,
         max_think_token_n=1000,
@@ -254,14 +253,6 @@ class InterleaveInferencer:
                 output_list.append(gen_text)
 
             else:
-                if think:
-                    system_prompt_for_think = GEN_THINK_SYSTEM_PROMPT
-                    gen_context = self.update_context_text(system_prompt_for_think, gen_context)
-                    cfg_img_context = self.update_context_text(system_prompt_for_think, cfg_img_context)
-                    gen_text = self.gen_text(gen_context, do_sample=do_sample, temperature=text_temperature, max_length=max_think_token_n)
-                    gen_context = self.update_context_text(gen_text, gen_context)
-                    output_list.append(gen_text)
-
                 img = self.gen_image(
                     image_shapes, 
                     gen_context, 

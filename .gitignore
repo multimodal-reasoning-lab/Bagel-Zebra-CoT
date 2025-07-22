@@ -13,3 +13,4 @@ bagel_example
 Zebra-CoT
 model_bf16.safetensors
 zebra-cot.tar.gz
+reasoning_output*

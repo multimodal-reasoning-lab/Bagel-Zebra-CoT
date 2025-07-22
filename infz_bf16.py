@@ -1,4 +1,6 @@
 import os
+import json
+from datetime import datetime
 from copy import deepcopy
 from typing import (
     Any,
@@ -29,17 +31,10 @@ from modeling.bagel.qwen2_navit import NaiveCache
 from modeling.autoencoder import load_ae
 
 # Set paths for your trained checkpoint
-checkpoint_dir = "/home/jovyan/workspace/bagel-training/h200-ckpt-0001200"
-base_model_path = "/dev/shm/models/BAGEL-7B-MoT"
-
-# Direct path to the safetensors file
+checkpoint_dir = "/dev/shm/models/Bagel-Zebra-CoT"
 checkpoint_file = "model_bf16.safetensors"
 checkpoint_path = os.path.join(checkpoint_dir, checkpoint_file)
 
-print(f"Checkpoint directory: {checkpoint_dir}")
-print(f"Checkpoint file: {checkpoint_file}")
-print(f"Full checkpoint path: {checkpoint_path}")
-print(f"File exists: {os.path.exists(checkpoint_path)}")
 
 print(f"Available GPUs: {torch.cuda.device_count()}")
 print(f"GPU memory per device:")
@@ -48,18 +43,18 @@ for i in range(torch.cuda.device_count()):
     print(f"  GPU {i}: {props.name}, {props.total_memory / 1e9:.1f} GB")
 
 # LLM config preparing (use base model configs)
-llm_config = Qwen2Config.from_json_file(os.path.join(base_model_path, "llm_config.json"))
+llm_config = Qwen2Config.from_json_file(os.path.join(checkpoint_dir, "llm_config.json"))
 llm_config.qk_norm = True
 llm_config.tie_word_embeddings = False
 llm_config.layer_module = "Qwen2MoTDecoderLayer"
 
 # ViT config preparing (use base model configs)
-vit_config = SiglipVisionConfig.from_json_file(os.path.join(base_model_path, "vit_config.json"))
+vit_config = SiglipVisionConfig.from_json_file(os.path.join(checkpoint_dir, "vit_config.json"))
 vit_config.rope = False
 vit_config.num_hidden_layers = vit_config.num_hidden_layers - 1
 
 # VAE loading (use base model VAE)
-vae_model, vae_config = load_ae(local_path=os.path.join(base_model_path, "ae.safetensors"))
+vae_model, vae_config = load_ae(local_path=os.path.join(checkpoint_dir, "ae.safetensors"))
 
 # Bagel config preparing
 config = BagelConfig(
@@ -82,7 +77,7 @@ with init_empty_weights():
     model.vit_model.vision_model.embeddings.convert_conv2d_to_linear(vit_config, meta=True)
 
 # Tokenizer Preparing (use base model tokenizer)
-tokenizer = Qwen2Tokenizer.from_pretrained(base_model_path)
+tokenizer = Qwen2Tokenizer.from_pretrained(checkpoint_dir)
 tokenizer, new_token_ids, _ = add_special_tokens(tokenizer)
 
 # Image Transform Preparing
@@ -184,7 +179,7 @@ torch.backends.cudnn.benchmark = False
 
 inference_hyper=dict(
     do_sample=True,
-    text_temperature=0.7,
+    text_temperature=0.3,
     cfg_text_scale=4.0,
     cfg_img_scale=2.0,
     cfg_interval=[0.0, 1.0],
@@ -196,45 +191,66 @@ inference_hyper=dict(
 
 INTERLEAVED_SYSTEM_PROMPT = '''You are an AI reasoning assistant capable of step-by-step interleaved text and visual chain of thought. Think step by step and use visual aids to enhance your problem-solving. Provide your final conclusion clearly in the format of "Final Answer: <answer here>"'''
 
+prompt = '''Subtract all cylinders. Add 1 red sphere. How many objects are left?'''
+image = Image.open('test_images/image.png')
 
-# prompt = '''A multi‑piece box jigsaw is missing part(s). Identify which option fills the hole(s).'''
-# image = Image.open('/home/jovyan/workspace/bagel-training/eval/sample_12400/raw_files/images/problem_image_1.jpg')
+print(prompt)
+print('-'*50)
 
-# prompt = '''What is the best move for Black to play?\n\nA: Qd6\nB: Kf8\nC: Nf4\nD: Nxe4'''
-# image = Image.open('/home/jovyan/workspace/bagel-training/eval/chess/game_2040/raw_files/images/problem_image_1.png')
-# pdf_filename = "chess.pdf"
+# Create output folder with timestamp
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+output_folder = f"reasoning_output_{timestamp}"
+images_folder = os.path.join(output_folder, "images")
+os.makedirs(images_folder, exist_ok=True)
 
-# prompt = '''Apply the following sequence of transformations to the blue shape: scale by 2×, then translate 1 left, then translate 1 down and 2 right, then translate 2 down and 1 right, then rotate 90° clockwise. Choose the option that shows the resulting shape.'''
-# image = Image.open('/home/jovyan/workspace/bagel-training/new_eval/compose_8847/images/problem_image_1.jpg')
-# pdf_filename = "compose_8847.pdf"
-
-# prompt = '''Which of the figures shown bellow cannot be cut out of the figure illustrated nearby?'''
-# image = Image.open('/home/jovyan/workspace/bagel-training/image.jpg')
-# pdf_filename = "math.pdf"
-
-prompt = '''Subtract all green metallic cylinders. Subtract all cyan blocks. How many objects are left?'''
-image = Image.open('/home/jovyan/workspace/bagel-training/new_eval/image.png')
-pdf_filename = "clevr.pdf"
-
-# print(prompt)
-# print('-'*50)
+# Save the original problem images if they exist
+problem_image_paths = []
+if image is not None:
+    if isinstance(image, list):
+        # Handle multiple images
+        for i, img in enumerate(image):
+            problem_image_path = os.path.join(images_folder, f"problem_image_{i+1}.png")
+            relative_path = os.path.join("images", f"problem_image_{i+1}.png")
+            img.save(problem_image_path)
+            problem_image_paths.append(relative_path)
+            print(f"Problem image {i+1} saved at '{problem_image_path}'")
+    else:
+        # Handle single image
+        problem_image_path = os.path.join(images_folder, "problem_image.png")
+        relative_path = os.path.join("images", "problem_image.png")
+        image.save(problem_image_path)
+        problem_image_paths.append(relative_path)
+        print(f"Problem image saved at '{problem_image_path}'")
 
 reasoning_text = []
 reasoning_images = []
-current_input = [prompt, image]
-think = False
+image_paths = []  # Store relative paths to images
+
+# Create input with multiple images properly flattened
+if image is not None:
+    if isinstance(image, list):
+        current_input = [prompt] + image  # Flatten the list of images
+    else:
+        current_input = [prompt, image]
+else:
+    current_input = [prompt]
 
 # Loop until no more vision_start tokens
 iteration = 0
 while True:    
     # Get understanding output
     print(f"iteration: {iteration}")
-    output = inferencer.interleave_inference(current_input, understanding_output=True, system_prompt=INTERLEAVED_SYSTEM_PROMPT, think=think, **inference_hyper)
+    output = inferencer.interleave_inference(current_input, understanding_output=True, system_prompt=INTERLEAVED_SYSTEM_PROMPT, **inference_hyper)
 
-    should_stop = ('<|vision_start|>' not in output[0]) or ('Final Answer' in output[0])
+    # Check for stopping conditions
+    has_final_answer = 'Final Answer:' in output[0] or '<answer>' in output[0]
+    
+    # Stop if we have a final answer OR if there's no vision token (no more images to generate)
+    # should_stop = has_final_answer or not has_vision_token
+    should_stop = has_final_answer
+
 
     if should_stop:
-        # print(f"should_stop: {output[0]}")
         if output[0].strip():
             extracted_text = output[0].split('<|im_end|>')[0].split('<|im_start|>')[1]
             reasoning_text.append(extracted_text)
@@ -242,106 +258,56 @@ while True:
             current_input = current_input + [extracted_text]
         break
     
-    # Extract reasoning text
-    # print(f"raw output: {output[0]}")
     extracted_text = output[0].split('<|im_end|>')[0].split('<|im_start|>')[1]
     reasoning_text.append(extracted_text)
     print(f"{extracted_text}")
     
     # Generate image based on current reasoning
     current_input_with_reasoning = current_input + [extracted_text]
-    if not think:
-        output = inferencer.interleave_inference(current_input_with_reasoning, system_prompt=INTERLEAVED_SYSTEM_PROMPT, think=think, **inference_hyper)
-        image_output = output[0]
-        
-    else: 
-        output = inferencer.interleave_inference(current_input_with_reasoning, system_prompt=INTERLEAVED_SYSTEM_PROMPT, think=think, **inference_hyper)
-
-        thinking_text = output[0]
-        print(f"image generation thinking_text: {thinking_text}")
-        extracted_text = thinking_text.split('<|im_end|>')[0].split('<|im_start|>')[1]
-        # reasoning_text.append(extracted_text)
-        # current_input_with_reasoning = current_input + [extracted_text]
-        image_output = output[1]
+    output = inferencer.interleave_inference(current_input_with_reasoning, system_prompt=INTERLEAVED_SYSTEM_PROMPT, **inference_hyper)
+    image_output = output[0]
 
     # Save and collect the generated image
     reasoning_images.append(image_output)
     image_filename = f'reasoning_image_{iteration + 1}.png'
-    image_output.save(image_filename)
-    print(f"Image saved at '{image_filename}'")
-
+    image_path = os.path.join(images_folder, image_filename)
+    relative_image_path = os.path.join("images", image_filename)  # Relative path for JSON
     
+    image_output.save(image_path)
+    image_paths.append(relative_image_path)
+    print(f"Image saved at '{image_path}'")
+
     # Update input for next iteration
     current_input = current_input_with_reasoning + [image_output]
     
     iteration += 1
     print('-'*50)
 
-# Create PDF with all reasoning text and images
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.utils import ImageReader
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-import io
+# Save reasoning data to JSON
+reasoning_data = {
+    "timestamp": timestamp,
+    "prompt": prompt,
+    "system_prompt": INTERLEAVED_SYSTEM_PROMPT,
+    "problem_image_paths": problem_image_paths if problem_image_paths else None,
+    "response": [
+        {
+            "step": i + 1,
+            "text": text,
+            "image_path": image_paths[i] if i < len(image_paths) else None
+        }
+        for i, text in enumerate(reasoning_text)
+    ],
+    "total_steps": len(reasoning_text),
+    "total_images": len(image_paths)
+}
 
-# Create PDF
-doc = SimpleDocTemplate(pdf_filename, pagesize=A4)
-styles = getSampleStyleSheet()
-story = []
+# Save JSON file
+json_path = os.path.join(output_folder, "reasoning_data.json")
+with open(json_path, 'w', encoding='utf-8') as f:
+    json.dump(reasoning_data, f, indent=2, ensure_ascii=False)
 
-# Add title
-title_style = ParagraphStyle(
-    'CustomTitle',
-    parent=styles['Heading1'],
-    fontSize=16,
-    spaceAfter=30,
-    alignment=1  # Center alignment
-)
-story.append(Paragraph("Example", title_style))
-story.append(Spacer(1, 20))
-
-# Add original question
-story.append(Paragraph("Original Question:", styles['Heading2']))
-story.append(Paragraph(prompt.replace('\n', '<br/>'), styles['Normal']))
-story.append(Spacer(1, 20))
-
-# Add original image
-story.append(Paragraph("Problem Image:", styles['Heading2']))
-# Convert PIL image to reportlab format
-img_buffer = io.BytesIO()
-image.save(img_buffer, format='PNG')
-img_buffer.seek(0)
-img = RLImage(img_buffer, width=4*inch, height=4*inch)
-story.append(img)
-story.append(Spacer(1, 20))
-
-# Add reasoning steps
-for i, (text, img) in enumerate(zip(reasoning_text, reasoning_images)):
-    story.append(Paragraph(f"Reasoning Step {i + 1}:", styles['Heading2']))
-    story.append(Paragraph(text.replace('\n', '<br/>'), styles['Normal']))
-    story.append(Spacer(1, 10))
-    
-    # Add generated image
-    story.append(Paragraph(f"Generated Image {i + 1}:", styles['Heading3']))
-    img_buffer = io.BytesIO()
-    img.save(img_buffer, format='PNG')
-    img_buffer.seek(0)
-    rl_img = RLImage(img_buffer, width=4*inch, height=4*inch)
-    story.append(rl_img)
-    story.append(Spacer(1, 20))
-
-# Add any final reasoning text that didn't generate an image
-if len(reasoning_text) > len(reasoning_images):
-    for i in range(len(reasoning_images), len(reasoning_text)):
-        story.append(Paragraph(f"Final Reasoning {i + 1}:", styles['Heading2']))
-        story.append(Paragraph(reasoning_text[i].replace('\n', '<br/>'), styles['Normal']))
-        story.append(Spacer(1, 20))
-# Build PDF
-doc.build(story)
-print(f"PDF saved as '{pdf_filename}'")
-print(f"Total reasoning steps: {len(reasoning_text)}")
-print(f"Total generated images: {len(reasoning_images)}")
-
+print(f"\nReasoning complete!")
+print(f"Output folder: {output_folder}")
+print(f"JSON metadata: {json_path}")
+print(f"Generated {len(image_paths)} images and {len(reasoning_text)} text steps")
 
