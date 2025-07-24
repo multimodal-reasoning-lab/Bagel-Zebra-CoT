@@ -36,6 +36,8 @@ snapshot_download(
 ```
 ### Inference
 
+![Image](assets/bagel-cot-example.png)
+
 The inference script (`infz_bf16.py`) supports inherent interleaved text and visual reasoning. To customize it for your
 specific use case:
 
