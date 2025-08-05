@@ -56,6 +56,12 @@ For example, under the `HF_HOME`, the path to the checkpoint folder is:
 checkpoint_dir = f"{HF_HOME}/models--multimodal-reasoning-lab--Bagel-Zebra-CoT/snapshots/c1ff3c56dd5909841523e3a6b554c77d919c2b28
 ```
 
+You can also use the local dir:
+
+```
+checkpoint_dir = f"{HF_HOME}/models/Bagel-Zebra-CoT
+```
+
 ##### 2. Setting up prompt and images
 
 Edit the prompt and image variables in `infz_bf16.py` (around lines 203-211):
