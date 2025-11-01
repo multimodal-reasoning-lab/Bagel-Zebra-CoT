@@ -127,13 +127,10 @@ The interleaved reasoning data customized for Zebra-CoT can be found in [think_t
 
 ### Cite
 ```bibtex
-@misc{li2025zebracot,
-      title={Zebra-CoT: A Dataset for Interleaved Vision Language Reasoning},
-      author={Ang Li and Charles Wang and Kaiyu Yue and Zikui Cai and Ollie Liu and Deqing Fu and Peng Guo and Wang Bill Zhu and Vatsal Sharan and Robin Jia and Willie Neiswanger and Furong Huang and Tom Goldstein and Micah Goldblum},
-      year={2025},
-      eprint={2507.16746},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2507.16746},
+@article{li2025zebra,
+  title={Zebra-cot: A dataset for interleaved vision language reasoning},
+  author={Li, Ang and Wang, Charles and Fu, Deqing and Yue, Kaiyu and Cai, Zikui and Zhu, Wang Bill and Liu, Ollie and Guo, Peng and Neiswanger, Willie and Huang, Furong and others},
+  journal={arXiv preprint arXiv:2507.16746},
+  year={2025}
 }
 ```
